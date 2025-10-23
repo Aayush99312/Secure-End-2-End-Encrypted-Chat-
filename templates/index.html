@@ -1,183 +1,172 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>💬 Secure Chat (E2EE)</title>
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoodChat – Secure Chat</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-
-    #chat-container {
-      width: 95%;
-      max-width: 480px;
-      height: 80vh;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 20px;
-      box-shadow: 0 4px 30px rgba(0,0,0,0.4);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      backdrop-filter: blur(10px);
-    }
-
-    #header {
-      background: rgba(0,0,0,0.3);
-      padding: 15px;
-      text-align: center;
-      font-size: 1.2rem;
-      font-weight: bold;
-      letter-spacing: 1px;
-      border-bottom: 1px solid rgba(255,255,255,0.2);
-    }
-
-    #messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      scroll-behavior: smooth;
-    }
-
-    .msg {
-      margin: 6px 0;
-      padding: 10px 14px;
-      border-radius: 18px;
-      max-width: 75%;
-      font-size: 0.95rem;
-      word-wrap: break-word;
-      display: inline-block;
-    }
-
-    .msg.me {
-      background: #00bfa6;
-      align-self: flex-end;
-      border-bottom-right-radius: 4px;
-    }
-
-    .msg.other {
-      background: #233446;
-      align-self: flex-start;
-      border-bottom-left-radius: 4px;
-    }
-
-    #footer {
-      display: flex;
-      padding: 10px;
-      background: rgba(0,0,0,0.3);
-      border-top: 1px solid rgba(255,255,255,0.2);
-    }
-
-    #msgBox {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      border-radius: 20px;
-      outline: none;
-      font-size: 0.95rem;
-      color: #333;
-    }
-
-    #sendBtn {
-      margin-left: 10px;
-      padding: 10px 18px;
-      border: none;
-      border-radius: 50%;
-      background: #00bfa6;
-      cursor: pointer;
-      color: #fff;
-      font-weight: bold;
-      transition: 0.2s;
-    }
-
-    #sendBtn:hover {
-      background: #00a891;
-      transform: scale(1.05);
-    }
-
-    /* Scrollbar */
-    #messages::-webkit-scrollbar {
-      width: 6px;
-    }
-    #messages::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.2);
-      border-radius: 10px;
-    }
-
-    @media (max-width: 600px) {
-      #chat-container {
-        height: 90vh;
-        width: 100%;
-        border-radius: 0;
-      }
-    }
-  </style>
+<style>
+:root {
+  --bg: linear-gradient(135deg,#141e30,#243b55);
+  --chat-bg: rgba(255,255,255,0.15);
+  --text: #fff;
+}
+body {
+  background: var(--bg);
+  background-size: cover;
+  color: var(--text);
+  font-family: "Poppins", sans-serif;
+  min-height: 100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+#login, #chat {width:100%;max-width:700px;}
+.glass {
+  background: var(--chat-bg);
+  backdrop-filter: blur(10px);
+  border-radius: 1rem;
+  padding: 2rem;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.theme-btn {border:none;border-radius:50%;width:50px;height:50px;margin:5px;cursor:pointer;}
+.msg-box {height:400px;overflow-y:auto;padding:10px;}
+.msg {margin:5px 0;}
+.msg.me {text-align:right;}
+.msg.me span{background:#4e9af1;}
+.msg span {
+  display:inline-block;
+  background:rgba(255,255,255,0.2);
+  padding:8px 14px;
+  border-radius:20px;
+}
+#fileInput{display:none;}
+</style>
 </head>
-
 <body>
-  <div id="chat-container">
-    <div id="header">🔒 Secure Chat (E2EE)</div>
-
-    <div id="messages"></div>
-
-    <div id="footer">
-      <input id="msgBox" placeholder="Type a message..." />
-      <button id="sendBtn">➤</button>
-    </div>
+<div id="login" class="glass text-center">
+  <h2>Welcome to MoodChat 💬</h2>
+  <p>Select your mood theme:</p>
+  <div id="themes" class="mb-3">
+    <button class="theme-btn" data-theme="neon" style="background:linear-gradient(45deg,#0f0,#09f);"></button>
+    <button class="theme-btn" data-theme="nature" style="background:linear-gradient(45deg,#2ecc71,#27ae60);"></button>
+    <button class="theme-btn" data-theme="city" style="background:linear-gradient(45deg,#2c3e50,#4ca1af);"></button>
+    <button class="theme-btn" data-theme="light" style="background:linear-gradient(45deg,#f8f9fa,#e9ecef);"></button>
+    <button class="theme-btn" data-theme="lux" style="background:linear-gradient(45deg,#000,#d4af37);"></button>
   </div>
 
-  <script>
-    const socket = io();
-    const username = prompt("Enter your username:");
-    socket.emit('register', { username: username });
+  <input id="username" class="form-control mb-2" placeholder="Enter your name">
+  <input id="room" class="form-control mb-3" placeholder="Enter secret chat code">
+  <button id="joinBtn" class="btn btn-primary w-100">Enter Secure Chat</button>
+</div>
 
-    const messagesDiv = document.getElementById('messages');
-    const msgBox = document.getElementById('msgBox');
-    const sendBtn = document.getElementById('sendBtn');
+<div id="chat" class="glass" style="display:none;">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 id="roomInfo">Room:</h5>
+    <button id="changeMood" class="btn btn-sm btn-outline-light">🎨 Change Mood</button>
+  </div>
+  <div id="messages" class="msg-box"></div>
+  <div class="d-flex mt-3">
+    <label for="fileInput" class="btn btn-outline-light me-2">📎</label>
+    <input type="file" id="fileInput">
+    <input id="msgInput" class="form-control me-2" placeholder="Type message...">
+    <button id="sendBtn" class="btn btn-success">Send</button>
+  </div>
+</div>
 
-    socket.on('system', (data) => {
-      addMessage("🟢 " + data.msg, "system");
-    });
+<script>
+const socket = io();
+let username, room, currentTheme='neon';
 
-    socket.on('message', (data) => {
-      const from = data.sender;
-      const text = data.msg;
-      if (from === username) addMessage("You: " + text, "me");
-      else addMessage(from + ": " + text, "other");
-    });
+const themes = {
+  neon: "linear-gradient(135deg,#1a2a6c,#b21f1f,#fdbb2d)",
+  nature: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=60') center/cover",
+  city: "url('https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=1200&q=60') center/cover",
+  light: "linear-gradient(135deg,#fff,#ddd)",
+  lux: "linear-gradient(135deg,#000,#d4af37)"
+};
 
-    function addMessage(msg, type) {
-      const div = document.createElement('div');
-      div.className = "msg " + (type === "me" ? "me" : "other");
-      div.innerText = msg;
-      messagesDiv.appendChild(div);
-      messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
+document.querySelectorAll(".theme-btn").forEach(b=>{
+  b.onclick=()=>{
+    currentTheme=b.dataset.theme;
+    document.body.style.background=themes[currentTheme];
+  };
+});
 
-    function sendMessage() {
-      const msg = msgBox.value.trim();
-      if (msg) {
-        socket.emit('message', { sender: username, text: msg });
-        msgBox.value = "";
-      }
-    }
+document.getElementById("joinBtn").onclick=()=>{
+  username=document.getElementById("username").value.trim();
+  room=document.getElementById("room").value.trim();
+  if(!username||!room)return alert("Enter name and code");
+  socket.emit("join",{username,room});
+  document.getElementById("login").style.display="none";
+  document.getElementById("chat").style.display="block";
+  document.body.style.background=themes[currentTheme];
+  document.getElementById("roomInfo").textContent="Room: "+room;
+};
 
-    sendBtn.onclick = sendMessage;
-    msgBox.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") sendMessage();
-    });
-  </script>
+document.getElementById("sendBtn").onclick=sendMsg;
+document.getElementById("msgInput").addEventListener("keypress",e=>{
+  if(e.key==="Enter")sendMsg();
+});
+
+function sendMsg(){
+  const msg=document.getElementById("msgInput").value.trim();
+  if(!msg)return;
+  socket.emit("message",{username,room,msg});
+  document.getElementById("msgInput").value="";
+}
+
+socket.on("message",data=>{
+  const div=document.createElement("div");
+  div.className="msg"+(data.username===username?" me":"");
+  div.innerHTML=`<span><b>${data.username}:</b> ${data.msg}</span>`;
+  document.getElementById("messages").appendChild(div);
+  scroll();
+});
+socket.on("system",data=>{
+  const div=document.createElement("div");
+  div.className="text-center text-muted";
+  div.textContent=data.msg;
+  document.getElementById("messages").appendChild(div);
+  scroll();
+});
+socket.on("file",data=>{
+  const div=document.createElement("div");
+  div.className="msg"+(data.username===username?" me":"");
+  div.innerHTML=`<span><b>${data.username}:</b> <a href="/file/${data.file_id}" target="_blank">${data.filename}</a></span>`;
+  document.getElementById("messages").appendChild(div);
+  scroll();
+});
+
+function scroll(){
+  const m=document.getElementById("messages");
+  m.scrollTop=m.scrollHeight;
+}
+
+// handle file uploads
+document.getElementById("fileInput").addEventListener("change",async e=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const base64=reader.result.split(',')[1];
+    socket.emit("upload",{username,room,filename:file.name,filedata:base64});
+  };
+  reader.readAsDataURL(file);
+  e.target.value="";
+});
+
+// leave event (self-destruct)
+window.addEventListener("beforeunload",()=>{
+  socket.emit("leave",{username,room});
+});
+
+document.getElementById("changeMood").onclick=()=>{
+  document.getElementById("chat").style.display="none";
+  document.getElementById("login").style.display="block";
+};
+</script>
 </body>
 </html>
