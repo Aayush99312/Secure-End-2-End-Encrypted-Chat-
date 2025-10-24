@@ -1,172 +1,352 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MoodChat – Secure Chat</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Sentinel — Secure Chat</title>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <style>
-:root {
-  --bg: linear-gradient(135deg,#141e30,#243b55);
-  --chat-bg: rgba(255,255,255,0.15);
-  --text: #fff;
-}
-body {
-  background: var(--bg);
-  background-size: cover;
-  color: var(--text);
-  font-family: "Poppins", sans-serif;
-  min-height: 100vh;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-#login, #chat {width:100%;max-width:700px;}
-.glass {
-  background: var(--chat-bg);
-  backdrop-filter: blur(10px);
-  border-radius: 1rem;
-  padding: 2rem;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-}
-.theme-btn {border:none;border-radius:50%;width:50px;height:50px;margin:5px;cursor:pointer;}
-.msg-box {height:400px;overflow-y:auto;padding:10px;}
-.msg {margin:5px 0;}
-.msg.me {text-align:right;}
-.msg.me span{background:#4e9af1;}
-.msg span {
-  display:inline-block;
-  background:rgba(255,255,255,0.2);
-  padding:8px 14px;
-  border-radius:20px;
-}
-#fileInput{display:none;}
+  /* BASIC RESET & DARK THEME */
+  :root { --accent: #00c9a7; --muted: #9aa6b2; --glass: rgba(255,255,255,0.03); }
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial;background:#000;color:#fff;overflow:hidden}
+  #canvas-bg { position:fixed; left:0;top:0;width:100%;height:100%; z-index:0; }
+  .center { position:relative; z-index:2; height:100vh; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+  /* UI Card */
+  .card {
+    width:960px; max-width:95vw; pointer-events:auto;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+    border-radius:16px; padding:20px; box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    display:flex; gap:20px; overflow:hidden;
+  }
+  .left { width:360px; min-width:260px; display:flex; flex-direction:column; gap:12px; }
+  .right { flex:1; display:flex; flex-direction:column; gap:12px; }
+  h1 { margin:0; font-size:20px; letter-spacing:0.6px; display:flex; align-items:center; gap:10px;}
+  .logo { width:36px; height:36px; }
+  .muted { color:var(--muted); font-size:13px; }
+  input[type="text"], input[type="password"]{
+    width:100%; padding:10px 12px; border-radius:10px; border:none; outline:none; background: rgba(255,255,255,0.02); color:#fff;
+  }
+  button { background:var(--accent); border:none; padding:10px 12px; border-radius:10px; color:#002a24; font-weight:700; cursor:pointer; }
+  .btn-ghost { background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--muted); padding:8px 10px; border-radius:8px; }
+  .small { font-size:12px; color:var(--muted); }
+  .messages { flex:1; background: rgba(0,0,0,0.25); border-radius:10px; padding:12px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+  .bubble { max-width:70%; padding:10px 14px; border-radius:14px; display:inline-block; word-wrap:break-word; }
+  .me { margin-left:auto; background:linear-gradient(90deg,var(--accent), #00bfa6); color:#012; }
+  .other { margin-right:auto; background:rgba(255,255,255,0.04); color:#fff; }
+  .topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+  .hidden { display:none; }
+  /* Splash & animations */
+  #splash { position:fixed; inset:0; z-index:3; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.8); color:#fff; font-size:20px; }
+  .enter-anim { transform-origin:center center; animation: enter 700ms ease both; }
+  @keyframes enter { from { transform: scale(0.92); opacity:0 } to { transform: scale(1); opacity:1 } }
+  /* Responsive */
+  @media (max-width:900px){
+    .card { flex-direction:column; width:95vw; height:90vh; padding:14px; }
+    .left { width:100%; min-width:auto; }
+  }
 </style>
 </head>
 <body>
-<div id="login" class="glass text-center">
-  <h2>Welcome to MoodChat 💬</h2>
-  <p>Select your mood theme:</p>
-  <div id="themes" class="mb-3">
-    <button class="theme-btn" data-theme="neon" style="background:linear-gradient(45deg,#0f0,#09f);"></button>
-    <button class="theme-btn" data-theme="nature" style="background:linear-gradient(45deg,#2ecc71,#27ae60);"></button>
-    <button class="theme-btn" data-theme="city" style="background:linear-gradient(45deg,#2c3e50,#4ca1af);"></button>
-    <button class="theme-btn" data-theme="light" style="background:linear-gradient(45deg,#f8f9fa,#e9ecef);"></button>
-    <button class="theme-btn" data-theme="lux" style="background:linear-gradient(45deg,#000,#d4af37);"></button>
-  </div>
+<canvas id="canvas-bg"></canvas>
 
-  <input id="username" class="form-control mb-2" placeholder="Enter your name">
-  <input id="room" class="form-control mb-3" placeholder="Enter secret chat code">
-  <button id="joinBtn" class="btn btn-primary w-100">Enter Secure Chat</button>
-</div>
+<!-- Splash -->
+<div id="splash">Welcome to Sentinel Secure chat platform</div>
 
-<div id="chat" class="glass" style="display:none;">
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <h5 id="roomInfo">Room:</h5>
-    <button id="changeMood" class="btn btn-sm btn-outline-light">🎨 Change Mood</button>
-  </div>
-  <div id="messages" class="msg-box"></div>
-  <div class="d-flex mt-3">
-    <label for="fileInput" class="btn btn-outline-light me-2">📎</label>
-    <input type="file" id="fileInput">
-    <input id="msgInput" class="form-control me-2" placeholder="Type message...">
-    <button id="sendBtn" class="btn btn-success">Send</button>
+<div class="center">
+  <div class="card enter-anim" id="mainCard" style="opacity:0;">
+    <div class="left">
+      <div style="display:flex;align-items:center;gap:12px">
+        <img src="/static/logo.png" class="logo" alt="Sentinel logo" onerror="this.style.display='none'">
+        <h1>Sentinel</h1>
+      </div>
+      <div class="muted small">Private 1-to-1 encrypted chat</div>
+
+      <!-- Create Room -->
+      <div style="margin-top:12px">
+        <div class="small muted">Create a new room</div>
+        <input id="createName" type="text" placeholder="Your display name">
+        <div style="height:8px"></div>
+        <button id="createBtn">Create Room</button>
+        <div id="createdBox" class="hidden" style="margin-top:12px">
+          <div class="small muted">Room Code</div>
+          <div style="font-weight:700" id="roomCodeBox"></div>
+          <div class="small muted">Secret Token (share privately)</div>
+          <div style="font-family:monospace;" id="tokenBox"></div>
+          <div class="small muted">Your User ID</div>
+          <div style="font-family:monospace;" id="userIdBox"></div>
+        </div>
+      </div>
+
+      <hr style="border:none;height:1px;background:rgba(255,255,255,0.03);margin:12px 0">
+
+      <!-- Join Room -->
+      <div>
+        <div class="small muted">Join existing room</div>
+        <input id="joinName" type="text" placeholder="Your display name">
+        <div style="height:8px"></div>
+        <input id="joinCode" type="text" placeholder="Room code (AAAA11)" style="text-transform:uppercase">
+        <div style="height:8px"></div>
+        <input id="joinToken" type="text" placeholder="Secret token">
+        <div style="height:8px"></div>
+        <button id="joinBtn" class="btn-ghost">Join Room</button>
+        <div id="joinFail" class="small" style="color:#ff9aa2; margin-top:8px; display:none"></div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div class="small muted">Sentinel • Private • Ephemeral</div>
+    </div>
+
+    <div class="right">
+      <div class="topbar">
+        <div>
+          <div class="small muted">Room</div>
+          <div id="roomTitle">No room</div>
+        </div>
+        <div>
+          <div class="small muted">Your ID</div>
+          <div id="myId" style="font-family:monospace">—</div>
+        </div>
+      </div>
+
+      <div id="chatPane" class="messages">
+        <div class="small muted">No conversation yet</div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <input id="msgInput" type="text" placeholder="Type a message..." style="flex:1" disabled>
+        <button id="sendBtn" disabled>Send</button>
+      </div>
+    </div>
   </div>
 </div>
 
 <script>
+/* ---------- Canvas Solar System background ---------- */
+const canvas = document.getElementById('canvas-bg');
+const ctx = canvas.getContext('2d');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+const stars = [];
+for (let i=0;i<300;i++){
+  stars.push({ x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*1.2, vx: (Math.random()-0.5)*0.02 });
+}
+
+const center = { x: canvas.width/2, y: canvas.height/2 };
+const sun = { r: Math.min(canvas.width, canvas.height) * 0.06 };
+
+const planets = [
+  { name:'Mercury', a: sun.r+60, r:6, period: 3, color:'#c7c7c7', moons:0 },
+  { name:'Venus', a: sun.r+100, r:8, period: 5, color:'#e6c27a', moons:0 },
+  { name:'Earth', a: sun.r+150, r:9, period: 8, color:'#2f8fff', moons:1 },
+  { name:'Mars', a: sun.r+200, r:7, period: 12, color:'#d45b3a', moons:2 },
+  { name:'Jupiter', a: sun.r+290, r:16, period: 20, color:'#c99b79', moons:3 },
+  { name:'Saturn', a: sun.r+380, r:14, period: 28, color:'#d7b77c', moons:1 },
+];
+
+let t = 0;
+function draw(){
+  t += 0.003;
+  // background
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // stars
+  for (let s of stars){
+    s.x += s.vx;
+    if (s.x < 0) s.x = canvas.width; if (s.x > canvas.width) s.x = 0;
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // center coordinates (recompute on resize)
+  center.x = canvas.width / 2;
+  center.y = canvas.height / 2;
+
+  // draw sun glow
+  const grad = ctx.createRadialGradient(center.x, center.y, sun.r*0.1, center.x, center.y, sun.r*2.5);
+  grad.addColorStop(0, 'rgba(255,210,120,0.95)');
+  grad.addColorStop(0.4, 'rgba(255,150,50,0.35)');
+  grad.addColorStop(1, 'rgba(255,100,20,0.05)');
+  ctx.beginPath();
+  ctx.fillStyle = grad;
+  ctx.arc(center.x, center.y, sun.r*2.3, 0, Math.PI*2);
+  ctx.fill();
+
+  // sun core
+  ctx.beginPath();
+  ctx.fillStyle = 'rgba(255,210,100,1)';
+  ctx.arc(center.x, center.y, sun.r, 0, Math.PI*2);
+  ctx.fill();
+
+  // planets and orbits
+  for (let i=0;i<planets.length;i++){
+    const p = planets[i];
+    const angle = t * (1/p.period) * (i+1) * 2;
+    const x = center.x + Math.cos(angle) * p.a;
+    const y = center.y + Math.sin(angle) * p.a * 0.66; // slight ellipse
+    // orbit line
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.ellipse(center.x, center.y, p.a, p.a*0.66, 0, 0, Math.PI*2);
+    ctx.stroke();
+
+    // planet shadow
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.arc(x+2, y+2, p.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // planet body
+    ctx.beginPath();
+    ctx.fillStyle = p.color;
+    ctx.arc(x, y, p.r, 0, Math.PI*2);
+    ctx.fill();
+
+    // moons
+    for (let m=0;m<p.moons;m++){
+      const ma = angle * (m+1.3) + (m*0.8);
+      const mx = x + Math.cos(ma) * (p.r + 12 + m*6);
+      const my = y + Math.sin(ma) * (p.r + 8 + m*4);
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(200,200,200,0.9)';
+      ctx.arc(mx, my, 2.2, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  requestAnimationFrame(draw);
+}
+draw();
+
+/* ---------- UI logic & socket.io ---------- */
 const socket = io();
-let username, room, currentTheme='neon';
+let currentRoom = null;
+let myUserId = null;
 
-const themes = {
-  neon: "linear-gradient(135deg,#1a2a6c,#b21f1f,#fdbb2d)",
-  nature: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=60') center/cover",
-  city: "url('https://images.unsplash.com/photo-1508057198894-247b23fe5ade?auto=format&fit=crop&w=1200&q=60') center/cover",
-  light: "linear-gradient(135deg,#fff,#ddd)",
-  lux: "linear-gradient(135deg,#000,#d4af37)"
+const splash = document.getElementById('splash');
+const mainCard = document.getElementById('mainCard');
+
+setTimeout(()=> {
+  splash.style.transition = 'opacity 200ms';
+  splash.style.opacity = '0';
+  setTimeout(()=> splash.remove(), 250);
+  // animate card in
+  mainCard.style.opacity = '1';
+}, 1000); // show splash for 1s exactly
+
+// DOM refs
+const createBtn = document.getElementById('createBtn');
+const createName = document.getElementById('createName');
+const createdBox = document.getElementById('createdBox');
+const roomCodeBox = document.getElementById('roomCodeBox');
+const tokenBox = document.getElementById('tokenBox');
+const userIdBox = document.getElementById('userIdBox');
+
+const joinBtn = document.getElementById('joinBtn');
+const joinName = document.getElementById('joinName');
+const joinCode = document.getElementById('joinCode');
+const joinToken = document.getElementById('joinToken');
+const joinFail = document.getElementById('joinFail');
+
+const roomTitle = document.getElementById('roomTitle');
+const myId = document.getElementById('myId');
+const messagesPane = document.getElementById('chatPane');
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+
+createBtn.onclick = () => {
+  const name = (createName.value || '').trim();
+  if (!name) return alert('Enter your display name');
+  socket.emit('create_room', { username: name });
 };
 
-document.querySelectorAll(".theme-btn").forEach(b=>{
-  b.onclick=()=>{
-    currentTheme=b.dataset.theme;
-    document.body.style.background=themes[currentTheme];
-  };
-});
-
-document.getElementById("joinBtn").onclick=()=>{
-  username=document.getElementById("username").value.trim();
-  room=document.getElementById("room").value.trim();
-  if(!username||!room)return alert("Enter name and code");
-  socket.emit("join",{username,room});
-  document.getElementById("login").style.display="none";
-  document.getElementById("chat").style.display="block";
-  document.body.style.background=themes[currentTheme];
-  document.getElementById("roomInfo").textContent="Room: "+room;
+joinBtn.onclick = () => {
+  joinFail.style.display = 'none';
+  const name = (joinName.value || '').trim();
+  const code = (joinCode.value || '').trim().toUpperCase();
+  const token = (joinToken.value || '').trim();
+  if (!name || !code || !token) { joinFail.innerText = 'Provide name, code and token.'; joinFail.style.display='block'; return; }
+  socket.emit('join_room_request', { username: name, room_code: code, token: token });
 };
 
-document.getElementById("sendBtn").onclick=sendMsg;
-document.getElementById("msgInput").addEventListener("keypress",e=>{
-  if(e.key==="Enter")sendMsg();
+socket.on('create_failed', d => alert(d.msg || 'Create failed'));
+socket.on('room_created', d => {
+  currentRoom = d.room_code;
+  myUserId = d.user_id;
+  roomCodeBox.innerText = d.room_code;
+  tokenBox.innerText = d.token;
+  userIdBox.innerText = d.user_id;
+  createdBox.classList.remove('hidden');
+  roomTitle.innerText = d.room_code;
+  myId.innerText = d.user_id;
+  messagesPane.innerHTML = '<div class="small muted">Room created. Waiting for partner...</div>';
+  msgInput.disabled = true; sendBtn.disabled = true;
 });
 
-function sendMsg(){
-  const msg=document.getElementById("msgInput").value.trim();
-  if(!msg)return;
-  socket.emit("message",{username,room,msg});
-  document.getElementById("msgInput").value="";
+socket.on('join_failed', d => {
+  joinFail.innerText = d.msg || 'Join failed';
+  joinFail.style.display = 'block';
+});
+
+socket.on('joined_room', d => {
+  currentRoom = d.room_code;
+  myUserId = d.user_id;
+  myId.innerText = d.user_id;
+  roomTitle.innerText = d.room_code;
+  messagesPane.innerHTML = '';
+  msgInput.disabled = false; sendBtn.disabled = false;
+  // show participants
+  const memberList = Object.values(d.members).map(m => m.username).join(', ');
+  const sys = document.createElement('div'); sys.className='small muted'; sys.innerText = 'Participants: ' + memberList;
+  messagesPane.appendChild(sys);
+});
+
+socket.on('message', d => {
+  if (!currentRoom || d.room_code !== currentRoom) return;
+  const el = document.createElement('div');
+  el.className = 'bubble ' + (d.sender === (document.getElementById('createName').value || document.getElementById('joinName').value) ? 'me' : 'other');
+  el.innerText = `${d.sender}: ${d.text}`;
+  messagesPane.appendChild(el);
+  messagesPane.scrollTop = messagesPane.scrollHeight;
+});
+
+socket.on('system', d => {
+  const s = document.createElement('div'); s.className='small muted'; s.innerText = d.msg;
+  messagesPane.appendChild(s);
+  messagesPane.scrollTop = messagesPane.scrollHeight;
+});
+
+socket.on('error', d => {
+  const s = document.createElement('div'); s.className='small muted'; s.style.color='#ff9aa2'; s.innerText = d.msg || 'Error';
+  messagesPane.appendChild(s);
+  messagesPane.scrollTop = messagesPane.scrollHeight;
+});
+
+sendBtn.onclick = () => sendMessage();
+msgInput.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+
+function sendMessage(){
+  const text = (msgInput.value || '').trim();
+  if (!text || !currentRoom || !myUserId) return;
+  socket.emit('send_message', { room_code: currentRoom, user_id: myUserId, text: text });
+  // append locally
+  const el = document.createElement('div'); el.className='bubble me'; el.innerText = 'You: ' + text;
+  messagesPane.appendChild(el);
+  messagesPane.scrollTop = messagesPane.scrollHeight;
+  msgInput.value = '';
 }
 
-socket.on("message",data=>{
-  const div=document.createElement("div");
-  div.className="msg"+(data.username===username?" me":"");
-  div.innerHTML=`<span><b>${data.username}:</b> ${data.msg}</span>`;
-  document.getElementById("messages").appendChild(div);
-  scroll();
-});
-socket.on("system",data=>{
-  const div=document.createElement("div");
-  div.className="text-center text-muted";
-  div.textContent=data.msg;
-  document.getElementById("messages").appendChild(div);
-  scroll();
-});
-socket.on("file",data=>{
-  const div=document.createElement("div");
-  div.className="msg"+(data.username===username?" me":"");
-  div.innerHTML=`<span><b>${data.username}:</b> <a href="/file/${data.file_id}" target="_blank">${data.filename}</a></span>`;
-  document.getElementById("messages").appendChild(div);
-  scroll();
-});
-
-function scroll(){
-  const m=document.getElementById("messages");
-  m.scrollTop=m.scrollHeight;
-}
-
-// handle file uploads
-document.getElementById("fileInput").addEventListener("change",async e=>{
-  const file=e.target.files[0];
-  if(!file)return;
-  const reader=new FileReader();
-  reader.onload=()=>{
-    const base64=reader.result.split(',')[1];
-    socket.emit("upload",{username,room,filename:file.name,filedata:base64});
-  };
-  reader.readAsDataURL(file);
-  e.target.value="";
-});
-
-// leave event (self-destruct)
-window.addEventListener("beforeunload",()=>{
-  socket.emit("leave",{username,room});
-});
-
-document.getElementById("changeMood").onclick=()=>{
-  document.getElementById("chat").style.display="none";
-  document.getElementById("login").style.display="block";
-};
+/* uppercase room code input */
+document.getElementById('joinCode').addEventListener('input', e => e.target.value = e.target.value.toUpperCase());
 </script>
 </body>
 </html>
